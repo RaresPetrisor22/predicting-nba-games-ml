@@ -129,9 +129,6 @@ def scrape_upcoming_games():
     
     today_str = now.strftime("%Y-%m-%d")
     
-    # Basketball-Reference stores a hidden sortable date string called 'csk' in the date column
-    # Example for March 8, 2026: csk="202603080LAL"
-    # We use this to perfectly match today's date without worrying about string formatting
     target_csk_prefix = now.strftime("%Y%m%d") 
 
     rows = table.find("tbody").find_all("tr")
@@ -156,9 +153,6 @@ def scrape_upcoming_games():
             home_a = home_td.find("a")
             
             if visitor_a and home_a:
-                # PRO HACK: Instead of manually mapping "Los Angeles Lakers" to "LAL",
-                # we extract the 3-letter abbreviation directly from the team link!
-                # href looks like: "/teams/LAL/2026.html" -> splitting gets "LAL"
                 visitor_abbr = visitor_a["href"].split("/")[2]
                 home_abbr = home_a["href"].split("/")[2]
                 
