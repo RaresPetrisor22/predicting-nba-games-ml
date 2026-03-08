@@ -1,2 +1,4 @@
 data/scores
 data/standings
+__pycache__/
+*.pyc
