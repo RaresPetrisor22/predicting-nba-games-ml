@@ -10,7 +10,7 @@ def prepare_training_data(df):
 
     X = df.drop(columns=string_cols + [
         "target","pts","pts_opp","won",
-        "usg%_roll10","usg%_opp_roll10","usg%_roll10_opp_history"
+        "usg%_roll10","usg%_opp_roll10","usg%_roll10_opp_history","mp"
     ])
     y = df["target"]
 

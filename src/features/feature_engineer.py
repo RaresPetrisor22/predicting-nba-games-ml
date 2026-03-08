@@ -128,7 +128,11 @@ def compute_elo_feature(df):
     return df
 
 def build_features(path):
-    df = load_raw_data(path)
+    if type(path)==str:
+        df = load_raw_data(path)
+    else:
+        df = path
+
     df = clean_data(df)
     df = create_target(df)
     df = compute_rolling_averages(df)

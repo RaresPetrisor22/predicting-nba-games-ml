@@ -1,4 +1,5 @@
 
+import datetime
 import os
 import pandas as pd
 from bs4 import BeautifulSoup, Comment
@@ -6,8 +7,6 @@ import io
 
 SCORE_DIR = "data/scores"
 CSV_PATH = "nba_games.csv"  
-
-
 
 def parse_html(box_scores):
     with open(box_scores,encoding="utf-8") as f:
@@ -141,6 +140,7 @@ def make_games_csv():
         else:
             new_games_df.to_csv(CSV_PATH, index=False)
             print("Created new CSV file with parsed games.")
+
 
 
 

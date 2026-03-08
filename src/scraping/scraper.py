@@ -108,5 +108,82 @@ def get_games():
         filepath = os.path.join(STANDINGS_DIR,f)
         scrape_game(filepath)
 
+def scrape_upcoming_games():
+    now = datetime.now()
+    current_month = now.strftime("%B").lower() 
+    
+    filename = f"NBA_{ACTIVE_SEASON}_games-{current_month}.html"
+    filepath = os.path.join(STANDINGS_DIR, filename)
+    
+    if not os.path.exists(filepath):
+        print(f"Schedule file not found: {filepath}. Make sure get_games() ran today.")
+        return []
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        html = f.read()
+
+    soup = BeautifulSoup(html, features="lxml")
+    table = soup.find("table", id="schedule")
+    
+    matchups = []
+    
+    today_str = now.strftime("%Y-%m-%d")
+    
+    # Basketball-Reference stores a hidden sortable date string called 'csk' in the date column
+    # Example for March 8, 2026: csk="202603080LAL"
+    # We use this to perfectly match today's date without worrying about string formatting
+    target_csk_prefix = now.strftime("%Y%m%d") 
+
+    rows = table.find("tbody").find_all("tr")
+    
+    for row in rows:
+        # Skip the mid-table header rows B-Ref sometimes inserts
+        if row.get("class") and "thead" in row.get("class"):
+            continue
+            
+        date_th = row.find("th", {"data-stat": "date_game"})
+        if not date_th or not date_th.get("csk"):
+            continue
+            
+        csk = date_th.get("csk")
+        
+        # If the hidden date string starts with today's date (e.g., '20260308')
+        if csk.startswith(target_csk_prefix):
+            visitor_td = row.find("td", {"data-stat": "visitor_team_name"})
+            home_td = row.find("td", {"data-stat": "home_team_name"})
+            
+            visitor_a = visitor_td.find("a")
+            home_a = home_td.find("a")
+            
+            if visitor_a and home_a:
+                # PRO HACK: Instead of manually mapping "Los Angeles Lakers" to "LAL",
+                # we extract the 3-letter abbreviation directly from the team link!
+                # href looks like: "/teams/LAL/2026.html" -> splitting gets "LAL"
+                visitor_abbr = visitor_a["href"].split("/")[2]
+                home_abbr = home_a["href"].split("/")[2]
+                
+                # Create a dummy row for the Home team
+                matchups.append({
+                    "date": today_str,
+                    "team": home_abbr,
+                    "team_opp": visitor_abbr,
+                    "home": 1,
+                    "id": csk
+                })
+                # Create a dummy row for the Away team
+                matchups.append({
+                    "date": today_str,
+                    "team": visitor_abbr,
+                    "team_opp": home_abbr,
+                    "home": 0,
+                    "id": csk
+                })
+                
+    print(f"Found {len(matchups) // 2} games scheduled for today ({today_str}).")
+    return matchups
+
+
+
+
 
 
