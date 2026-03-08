@@ -61,5 +61,3 @@ def predict_tonight():
 
 if __name__ == "__main__":
     predict_tonight()
-
-
