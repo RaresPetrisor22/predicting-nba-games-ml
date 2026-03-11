@@ -89,7 +89,7 @@ def scrape_game(standings_file):
         if os.path.exists(save_path):
             continue
         
-        print(f"Scraping game: {url.split("/")[-1]}")
+        print(f"Scraping game: {url.split('/')[-1]}")
 
         html = get_html(url,"#content")
         if not html:
