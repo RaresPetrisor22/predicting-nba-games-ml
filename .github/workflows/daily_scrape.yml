@@ -24,7 +24,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run Scraper Script
-        run: python scripts/scrape_games.py
+        run: python -m scripts.scrape_games
 
       - name: Commit and push changes
         run: |
