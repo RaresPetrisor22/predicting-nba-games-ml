@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup, Comment
 import io
 
 SCORE_DIR = "data/scores"
-CSV_PATH = "nba_games.csv"  
+CSV_PATH = "data/nba_games.csv"  
 
 def parse_html(box_scores):
     with open(box_scores,encoding="utf-8") as f:
