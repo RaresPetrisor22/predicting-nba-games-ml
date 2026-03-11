@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 import time
 import urllib.request
 from datetime import datetime, timedelta
+import pandas as pd
 
 CURRENT_TIME = datetime.now()
 SEASONS = [x for x in range(2016,CURRENT_TIME.year+1)]
@@ -11,6 +12,18 @@ DATA_DIR = "data"
 STANDINGS_DIR = os.path.join(DATA_DIR,"standings")
 SCORES_DIR = os.path.join(DATA_DIR,"scores")
 ACTIVE_SEASON = CURRENT_TIME.year if CURRENT_TIME.month < 7 else CURRENT_TIME.year+1
+
+os.makedirs(STANDINGS_DIR, exist_ok=True)
+os.makedirs(SCORES_DIR, exist_ok=True)
+
+def get_parsed_game_ids():
+    csv_path = os.path.join(DATA_DIR,"nba_games.csv")
+    if os.path.exists(csv_path):
+        df = pd.read_csv(csv_path, usecols=["id"])
+        return set(df["id"].values)
+    return set()
+
+PARSED_IDS = get_parsed_game_ids()
 
 def get_html(url,selector, sleep_time = 5, retries=3):
     html = None
@@ -54,6 +67,7 @@ def scrape_season(season):
     
     first_day_this_month = now.replace(day=1)
     prev_month = (first_day_this_month - timedelta(days=1)).strftime("%B").lower()
+    csv_exists =os.path.exists(os.path.join(DATA_DIR,"nba_games.csv"))
     
   
     for url in standings_pages:
@@ -63,8 +77,14 @@ def scrape_season(season):
         
         force_rescrape = (season == ACTIVE_SEASON) and (month_in_url in [current_month, prev_month])
 
+        # cloud optimization for daily rescrape
+        if season == ACTIVE_SEASON and csv_exists and month_in_url not in [current_month, prev_month]:
+            continue
+
+        # local optimization
         if os.path.exists(save_path) and not force_rescrape:
             continue
+        
         
         print(f"Scraping URL: {url}")
 
@@ -85,8 +105,10 @@ def scrape_game(standings_file):
     box_scores = [l for l in hrefs if l and "boxscores" in l and ".html" in l]
     box_scores = [f"https://www.basketball-reference.com{l}" for l in box_scores]
     for url in box_scores:
-        save_path = os.path.join(SCORES_DIR,url.split("/")[-1])
-        if os.path.exists(save_path):
+        filename = url.split("/")[-1]
+        save_path = os.path.join(SCORES_DIR,filename)
+        game_id = filename.replace(".html", "")
+        if game_id in PARSED_IDS:
             continue
         
         print(f"Scraping game: {url.split('/')[-1]}")

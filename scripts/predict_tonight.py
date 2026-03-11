@@ -28,7 +28,7 @@ def predict_tonight():
         print("No games scheduled for today. See you tomorrow!")
         return
 
-    df = pd.read_csv("nba_games.csv",index_col=0)
+    df = pd.read_csv("data/nba_games.csv",index_col=0)
     
     future_df = pd.DataFrame(matchups)
     
