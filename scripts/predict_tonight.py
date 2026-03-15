@@ -7,6 +7,7 @@ from src.model.train import prepare_training_data
 from src.scraping.scraper import ACTIVE_SEASON
 
 def display_results(results_df,probabilities):
+    results = []
     for i, (_,row) in enumerate(results_df.iterrows()):
         home_team = row["team"]
         away_team = row["team_opp"]
@@ -15,10 +16,13 @@ def display_results(results_df,probabilities):
         home_win_prob = probabilities[i][1] * 100
         away_win_prob = probabilities[i][0] * 100
         
-        print(f"{home_team} (Home) vs {away_team} (Away)")
-        print(f"  -> {home_team} Win Probability: {home_win_prob:.1f}%")
-        print(f"  -> {away_team} Win Probability: {away_win_prob:.1f}%")
-        print("-" * 40)
+        results.append({
+            "home": home_team,
+            "away": away_team,
+            "home_prob": round(home_win_prob, 1),
+            "away_prob": round(away_win_prob, 1)
+        })
+    return results
 
 def predict_tonight():
     print("Fetching tonight's matchups...")
@@ -26,7 +30,7 @@ def predict_tonight():
     
     if not matchups:
         print("No games scheduled for today. See you tomorrow!")
-        return
+        return []
 
     df = pd.read_csv("data/nba_games.csv",index_col=0)
     
@@ -57,7 +61,12 @@ def predict_tonight():
 
     probabilities = pipeline.predict_proba(X_tonight)
    
-    display_results(tonight_features_df,probabilities)
+    return display_results(tonight_features_df,probabilities)
 
 if __name__ == "__main__":
-    predict_tonight()
+    preds = predict_tonight()
+    for p in preds:
+        print(f"{p['home']} (Home) vs {p['away']} (Away)")
+        print(f"  -> {p['home']} Win Probability: {p['home_prob']:.1f}%")
+        print(f"  -> {p['away']} Win Probability: {p['away_prob']:.1f}%")
+        print("-" * 40)
