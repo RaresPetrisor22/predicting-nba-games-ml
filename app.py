@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
+import matplotlib.pyplot as plt
 
 # Import custom feature engineering functions
 from src.features.feature_engineer import load_raw_data
@@ -123,6 +124,11 @@ st.markdown("""
         color: #F8FAFC;
         font-weight: bold;
     }
+    /* Style the little "x" (close) button inside the pill too, to match */
+    [data-testid="stMultiSelect"] span[data-baseweb="tag"] svg {
+        fill: #FCBF49 !important;
+    }
+
     /* Hide the entire top toolbar (hamburger menu, deploy button, etc.) */
     [data-testid="stToolbar"] {
         visibility: hidden !important;
@@ -153,7 +159,7 @@ def main():
         f"""
         <div style="display: flex; align-items: center; gap: 18px; margin-bottom: 25px;">
             <img src="data:image/png;base64,{logo_b64}" style="width: 48px; height: 48px; object-fit: contain;">
-            <h1 style="margin: 0; padding: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 700; color: #F8FAFC;">
+            <h1 style="margin: 0; padding: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 700; color: #FCBF49;">
                 Basketball ML Prediction Dashboard
             </h1>
         </div>
@@ -177,10 +183,11 @@ def main():
     all_teams = sorted(list(df['team'].unique()))
 
     # Create Tabs
-    tab1, tab2, tab3 = st.tabs([
+    tab1, tab2, tab3, tab4 = st.tabs([
         "Tonight's Predictions", 
         "Team Analytics", 
-        "Historical Elo Tracker"
+        "Historical Elo Tracker",
+        "Model Performance"
     ])
 
     # --- TAB 1: Tonight's Predictions ---
@@ -355,7 +362,7 @@ def main():
         selected_team = st.selectbox("Select a Team:", all_teams, format_func=lambda x: NBA_TEAMS[x]["name"],key="team_select_analytics")
         
         basic_stats = ['date','team','team_opp', 'won','pts', 'pts_opp',"fg","fga","fg%","3p","3pa","3p%","ft","fta","ft%","orb","drb","trb","ast","stl","blk","tov","pf"] 
-        advanced_stats = ['date','team','team_opp','ts%','efg%','3par','ftr','orb%','drb%','trb%','ast%','stl%','blk%','tov%','usg%','ortg','drtg']
+        advanced_stats = ['date','team','team_opp',"won",'ts%','efg%','3par','ftr','orb%','drb%','trb%','ast%','stl%','blk%','tov%','usg%','ortg','drtg']
 
         stat_groups = {
             "Basic": basic_stats,
@@ -368,15 +375,53 @@ def main():
         last_10 = team_games.head(10)
         
         for stat_type, stats_list in stat_groups.items():
-            st.subheader(f"Last 10 Games {stat_type} Stats for *{selected_team}*")
-            
-            # Keep only columns that exist
+            st.markdown(
+                f"<h3 style='margin-bottom: 8px;'>Last 10 Games "
+                f"<span style='color:#FCBF49;'>{stat_type} Stats </span> "
+                f"for <em>{NBA_TEAMS.get(selected_team, {}).get('name', selected_team)}</em></h3>",
+                unsafe_allow_html=True
+            )
+
+            # Keep only columns that exist in this slice
             display_cols = [c for c in stats_list if c in last_10.columns]
-            
+
+            # --- UI copy: never mutate the source data ---
+            ui_df = last_10[display_cols].copy()
+
+            # Build column_config incrementally
+            col_cfg = {}
+
+            # Transform team logo columns → SVG URL strings for ImageColumn
+            for logo_col, title in [("team", "Team"), ("team_opp", "Opp")]:
+                if logo_col in ui_df.columns:
+                    ui_df[logo_col] = ui_df[logo_col].apply(
+                        lambda abbr: get_logo_url(NBA_TEAMS.get(str(abbr).strip(), {}).get("id", ""))
+                    )
+                    col_cfg[logo_col] = st.column_config.ImageColumn(title, width="small")
+
+            # Transform won column → readable colored text for TextColumn
+            if "won" in ui_df.columns:
+                def _won_label(v):
+                    try:
+                        return "✅ Win" if int(float(v)) == 1 else "❌ Loss"
+                    except (ValueError, TypeError):
+                        return str(v)
+                ui_df["won"] = ui_df["won"].apply(_won_label)
+                col_cfg["won"] = st.column_config.TextColumn("Result", width="small")
+
+            numeric_cols = [c for c in ui_df.columns if ui_df[c].dtype in ['float64', 'int64']
+                            and c not in ('won',)]
+
+            styled_df = ui_df.style.format(
+                {c: "{:.2f}" for c in numeric_cols},
+                na_rep="—"
+            )
+
             st.dataframe(
-                last_10[display_cols].style.format(precision=2),
-                width="stretch",
-                hide_index=True
+                styled_df,
+                column_config=col_cfg,
+                use_container_width=True,
+                hide_index=True,
             )
 
         
@@ -385,53 +430,142 @@ def main():
     with tab3:
         st.header("Historical Elo Tracker")
         
-        selected_team_elo = st.selectbox("Select a Team:", all_teams, key="team_select_elo")
+        selected_teams_elo = st.multiselect("Select Teams to Compare:", all_teams, 
+                                            default=['BOS', 'LAL'], # Default to a classic rivalry
+                                            format_func=lambda x: NBA_TEAMS[x]["name"], 
+                                            key="team_select_elo")
         
-        # We need to extract the Elo for the selected team over time
-        # The team could be in 'team' or 'team_opp'
-        # To get a chronological series of the team's Elo:
-        
-        # Filter rows where the team played
-        team_filter = (df['team'] == selected_team_elo) | (df['team_opp'] == selected_team_elo)
-        team_elo_df = df[team_filter].copy()
-        
-        # Extract the correct Elo depending on if they were 'team' or 'team_opp'
-        # Assuming `home_elo` corresponds to `team` if home==1, wait: `home_elo` and `away_elo` 
-        # were created based on `team` and `team_opp` in `compute_elo_feature`.
-        # Looking at `feature_engineer.py`: 
-        # current_home_elo = teams_dict[row.team]
-        # current_away_elo = teams_dict[row.team_opp]
-        # So `home_elo` is just the elo of `team`, and `away_elo` is the elo of `team_opp`.
-        
-        def get_team_elo(row):
-            if row['team'] == selected_team_elo:
-                return row['home_elo']
-            else:
-                return row['away_elo']
+        if not selected_teams_elo:
+            st.warning("Please select at least one team to view the Elo chart.")
+        else:
+            team_dfs = []
+            
+            for team in selected_teams_elo:
+                team_filter = (df['team'] == team) | (df['team_opp'] == team)
+                team_elo_df = df[team_filter].copy()
                 
-        team_elo_df['Team_Elo'] = team_elo_df.apply(get_team_elo, axis=1)
-        team_elo_df = team_elo_df.sort_values('date')
-        
-        # Plotting
-        fig = px.line(
-            team_elo_df, 
-            x='date', 
-            y='Team_Elo',
-            title=f"Historical Elo Rating for {selected_team_elo}",
-            labels={'date': 'Date', 'Team_Elo': 'Elo Rating'},
-            color_discrete_sequence=['#FCBF49'] 
+                # A helper to pull the correct rating from the perspective of the chosen team
+                def get_team_elo(row, t=team):
+                    if row['team'] == t:
+                        return row['home_elo']
+                    else:
+                        return row['away_elo']
+                        
+                team_elo_df['Team_Elo'] = team_elo_df.apply(get_team_elo, axis=1)
+                team_elo_df['Team_Name'] = NBA_TEAMS.get(team, {}).get('name', team)
+                team_elo_df = team_elo_df.sort_values('date')
+                team_dfs.append(team_elo_df[['date', 'Team_Elo', 'Team_Name']])
+                
+            combined_elo_df = pd.concat(team_dfs)
+
+            # Map of symbolic NBA Primary Colors
+            TEAM_COLORS = {
+                "Atlanta Hawks": "#E03A3E", "Boston Celtics": "#007A33", "Brooklyn Nets": "#FFFFFF",
+                "Charlotte Hornets": "#1D1160", "Chicago Bulls": "#CE1141", "Cleveland Cavaliers": "#860038",
+                "Dallas Mavericks": "#00538C", "Denver Nuggets": "#0E2240", "Detroit Pistons": "#C8102E",
+                "Golden State Warriors": "#1D428A", "Houston Rockets": "#CE1141", "Indiana Pacers": "#FDBB30",
+                "Los Angeles Clippers": "#C8102E", "Los Angeles Lakers": "#552583", "Memphis Grizzlies": "#5D76A9",
+                "Miami Heat": "#98002E", "Milwaukee Bucks": "#00471B", "Minnesota Timberwolves": "#0C2340",
+                "New Orleans Pelicans": "#0C2340", "New York Knicks": "#F58426", "Oklahoma City Thunder": "#007AC1",
+                "Orlando Magic": "#0077C0", "Philadelphia 76ers": "#006BB6", "Phoenix Suns": "#1D1160",
+                "Portland Trail Blazers": "#E03A3E", "Sacramento Kings": "#5A2D81", "San Antonio Spurs": "#C4CED4",
+                "Toronto Raptors": "#CE1141", "Utah Jazz": "#002B5C", "Washington Wizards": "#002B5C"
+            }
+
+            # Plotting
+            fig = px.line(
+                combined_elo_df, 
+                x='date', 
+                y='Team_Elo',
+                color='Team_Name',
+                title="Historical Elo Rating Comparison",
+                labels={'date': 'Date', 'Team_Elo': 'Elo Rating', 'Team_Name': 'Team'},
+                color_discrete_map=TEAM_COLORS
+            )
+            
+            fig.update_layout(
+                plot_bgcolor='#1E293B',
+                paper_bgcolor='#1E293B',
+                font=dict(family="Helvetica Neue", color="#F8FAFC"),
+                xaxis=dict(showgrid=True, gridcolor='#334155'),
+                yaxis=dict(showgrid=True, gridcolor='#334155'),
+                hovermode="closest",
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1,
+                    title=""
+                )
+            )
+            
+            st.plotly_chart(fig, width='stretch')
+
+        # --- Elo Methodology Explanation ---
+        st.markdown(
+"""
+<div style="margin-top: 32px; background-color: #1E293B; border: 1px solid #334155;
+            border-radius: 12px; padding: 28px 32px;">
+
+<h3 style="color: #F8FAFC; margin: 0 0 6px 0; font-size: 1.2rem; letter-spacing: 0.5px;">
+    How is the Elo Rating calculated?
+</h3>
+<p style="color: #94A3B8; font-size: 0.9rem; margin: 0 0 24px 0;">
+    This model uses a custom Elo system adapted from chess, tuned for NBA basketball.
+    Each team starts every season at <span style="color:#FCBF49; font-weight:bold;">1500</span> (with a partial regression toward that baseline between seasons).
+</p>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+
+<div style="background:#0F172A; border-radius:8px; padding:18px; border-left: 3px solid #FCBF49;">
+<div style="color:#FCBF49; font-size:0.75rem; font-weight:bold; letter-spacing:1px; margin-bottom:8px;">STEP 1 — EXPECTED SCORE</div>
+<code style="color:#F8FAFC; font-size:0.85rem;">E_home = 1 / (1 + 10<sup>((away_elo − home_elo) / 400)</sup>)</code>
+<p style="color:#94A3B8; font-size:0.82rem; margin:10px 0 0 0;">
+    The classic logistic curve gives each team a win probability before the game is played.
+    A 400-point Elo gap = ~91% win probability for the stronger team.
+</p>
+</div>
+
+<div style="background:#0F172A; border-radius:8px; padding:18px; border-left: 3px solid #1D428A;">
+<div style="color:#4B9FE1; font-size:0.75rem; font-weight:bold; letter-spacing:1px; margin-bottom:8px;">STEP 2 — MARGIN-OF-VICTORY K-FACTOR</div>
+<code style="color:#F8FAFC; font-size:0.85rem; line-height:1.8;">K = 20 × (|MOV| + 3)<sup>0.8</sup> / (7.5 + 0.006 × |Δelo|)</code>
+<p style="color:#94A3B8; font-size:0.82rem; margin:10px 0 0 0;">
+    Unlike chess, NBA outcomes scale with the margin of victory (<strong style="color:#F8FAFC">MOV</strong>).
+    Blowout wins earn more Elo than squeakers. The denominator dampens gains from beating already-weaker opponents by large margins.
+</p>
+</div>
+
+<div style="background:#0F172A; border-radius:8px; padding:18px; border-left: 3px solid #1D428A;">
+<div style="color:#4B9FE1; font-size:0.75rem; font-weight:bold; letter-spacing:1px; margin-bottom:8px;">STEP 3 — ELO UPDATE RULE</div>
+<code style="color:#F8FAFC; font-size:0.85rem; line-height:1.8;">new_elo = old_elo + K × (actual − expected)</code>
+<p style="color:#94A3B8; font-size:0.82rem; margin:10px 0 0 0;">
+    <strong style="color:#F8FAFC">actual</strong> = 1 for a win, 0 for a loss.
+    Beating a highly-rated opponent yields a large gain; losing to a weak team yields a large drop.
+    Both teams' ratings are updated after every game.
+</p>
+</div>
+
+<div style="background:#0F172A; border-radius:8px; padding:18px; border-left: 3px solid #FCBF49;">
+<div style="color:#FCBF49; font-size:0.75rem; font-weight:bold; letter-spacing:1px; margin-bottom:8px;">STEP 4 — SEASON RESET</div>
+<code style="color:#F8FAFC; font-size:0.85rem; line-height:1.8;">elo<sub>new season</sub> = elo × 0.75 + 1505 × 0.25</code>
+<p style="color:#94A3B8; font-size:0.82rem; margin:10px 0 0 0;">
+    At the start of each new season, all ratings regress 25% toward the mean (<strong style="color:#F8FAFC">1505</strong>).
+    This accounts for roster changes and prevents ancient dominance from over-influencing current predictions.
+</p>
+</div>
+
+</div>
+</div>
+""",
+            unsafe_allow_html=True
         )
-        
-        fig.update_layout(
-            plot_bgcolor='#1E293B',
-            paper_bgcolor='#1E293B',
-            font=dict(family="Helvetica Neue", color="#F8FAFC"),
-            xaxis=dict(showgrid=True, gridcolor='#334155'),
-            yaxis=dict(showgrid=True, gridcolor='#334155'),
-            hovermode="x unified"
-        )
-        
-        st.plotly_chart(fig, width='stretch')
+
+    # --- TAB 4: Model Performance ---
+    with tab4:
+        st.header("Model Performance")
+        st.info("Model evaluation and performance metrics will go here.")
+
 
 if __name__ == "__main__":
     main()
