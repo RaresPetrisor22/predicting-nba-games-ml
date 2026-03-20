@@ -163,8 +163,17 @@ def main():
     st.markdown("""
     **An automated, end-to-end Machine Learning pipeline for forecasting NBA matchups.** This dashboard serves **live win probabilities** powered by a Logistic Regression model. Behind the scenes, a cloud-hosted web scraper updates the database daily, engineering custom features like **10-game rolling averages** and **dynamic Elo ratings** to predict tonight's games.
     """)
+
+    @st.cache_data
+    def get_cached_data(path):
+        df = load_raw_data(path)
+        return df
+
+    @st.cache_data(ttl=21600)
+    def get_cached_predictions():
+        return predict_tonight()
     
-    df = load_raw_data("data/nba_games_processed.csv")
+    df = get_cached_data("data/nba_games_processed.csv")
     all_teams = sorted(list(df['team'].unique()))
 
     # Create Tabs
@@ -180,7 +189,7 @@ def main():
         st.markdown(f"**Date:** {datetime.now().strftime('%B %d, %Y')}")
         
         with st.spinner("Fetching tonight's matchups and running predictions..."):
-            matchups = predict_tonight()
+            matchups = get_cached_predictions()
 
         # Key stats to surface in the breakdown (roll10 column suffix → display name)
         KEY_STATS = [
@@ -340,7 +349,7 @@ def main():
 
     # --- TAB 2: Team Analytics ---
     with tab2:
-        data = load_raw_data("data/nba_games.csv")
+        data = get_cached_data("data/nba_games.csv")
         st.header("Team Analytics")
         
         selected_team = st.selectbox("Select a Team:", all_teams, format_func=lambda x: NBA_TEAMS[x]["name"],key="team_select_analytics")
