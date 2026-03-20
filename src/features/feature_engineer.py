@@ -139,14 +139,3 @@ def build_features(path):
     df = keep_home_games_only(df)
     df = compute_elo_feature(df)
     return df
-
-def print_MEM_last_10games():
-    df = load_raw_data("data/nba_games.csv")
-    df = clean_data(df)
-    df = create_target(df)
-    df = df[df["team"] == "MEM"].sort_values("date")
-    print(df[["date","team","team_opp","won","pts"]].tail(10))
-    print(df["pts"].tail(10).mean())
-    return df
-
-print_MEM_last_10games()

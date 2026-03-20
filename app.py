@@ -4,7 +4,7 @@ import plotly.express as px
 from datetime import datetime
 
 # Import custom feature engineering functions
-from src.features.feature_engineer import clean_data, create_target, compute_rolling_averages, compute_elo_feature
+from src.features.feature_engineer import load_raw_data
 from scripts.predict_tonight import predict_tonight
 
 # --- TEAM DICTIONARY ---
@@ -138,31 +138,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- DATA LOADING & CACHING ---
-@st.cache_data
-def load_and_process_data():
-    # Load raw data
-    df = pd.read_csv("data/nba_games.csv", index_col=0)
-    df = df.sort_values("date").reset_index(drop=True)
-    
-    # We want to use the user's functions, but we need the data BEFORE `keep_home_games_only`
-    # so we can track a team whether they are home or away easily for analytics/elo.
-    # So we will replicate `build_features` partially to get Elo and rolling stats
-    
-    df_clean = clean_data(df)
-    df_target = create_target(df_clean)
-    
-    # Calculate Rolling Averages
-    df_rolling = compute_rolling_averages(df_target)
-    
-    # Calculate Elo (requires `home_elo` and `away_elo` computation)
-    # We can pass df_rolling to compute_elo_feature
-    df_elo = compute_elo_feature(df_rolling)
-    
-    # For easier querying by team, we'll create a unified view of team performance.
-    return df_elo
-
-
 
 # --- MAIN APP ---
 def main():
@@ -189,14 +164,8 @@ def main():
     **An automated, end-to-end Machine Learning pipeline for forecasting NBA matchups.** This dashboard serves **live win probabilities** powered by a Logistic Regression model. Behind the scenes, a cloud-hosted web scraper updates the database daily, engineering custom features like **10-game rolling averages** and **dynamic Elo ratings** to predict tonight's games.
     """)
     
-    try:
-        df = load_and_process_data()
-        
-        # Get list of all unique teams
-        all_teams = sorted(list(df['team'].unique()))
-    except Exception as e:
-        st.error(f"Error loading data: {e}")
-        return
+    df = load_raw_data("data/nba_games_processed.csv")
+    all_teams = sorted(list(df['team'].unique()))
 
     # Create Tabs
     tab1, tab2, tab3 = st.tabs([
@@ -226,7 +195,7 @@ def main():
             ('tov_roll10',   'Turnovers'),
             ('ortg_roll10',  'Off. Rating'),
             ('drtg_roll10',  'Def. Rating'),
-            ('won_roll10',   'Win Rate'),
+            ('won_roll10',   'Win Rate Percentage'),
         ]
 
         def get_team_last10_stats(team_abbr):
@@ -298,7 +267,7 @@ def main():
                     GRAY  = "#94A3B8"
                     if home_val is None or away_val is None:
                         return GRAY, GRAY
-                    if home_val == away_val:
+                    if abs(float(home_val) - float(away_val)) < 0.01:
                         return GRAY, GRAY
                     lower_wins = col in LOWER_IS_BETTER
                     home_better = (home_val < away_val) if lower_wins else (home_val > away_val)
@@ -371,31 +340,37 @@ def main():
 
     # --- TAB 2: Team Analytics ---
     with tab2:
+        data = load_raw_data("data/nba_games.csv")
         st.header("Team Analytics")
         
         selected_team = st.selectbox("Select a Team:", all_teams, format_func=lambda x: NBA_TEAMS[x]["name"],key="team_select_analytics")
         
-        # Filter games where the selected team is playing (either home or away)
-        # Note: The dataframe from `compute_rolling_averages` dropped `total`, etc.
-        # But 'team' is always the primary team for that row in the original df.
-        team_games = df[df['team'] == selected_team].copy()
+        basic_stats = ['date','team','team_opp', 'won','pts', 'pts_opp',"fg","fga","fg%","3p","3pa","3p%","ft","fta","ft%","orb","drb","trb","ast","stl","blk","tov","pf"] 
+        advanced_stats = ['date','team','team_opp','ts%','efg%','3par','ftr','orb%','drb%','trb%','ast%','stl%','blk%','tov%','usg%','ortg','drtg']
+
+        stat_groups = {
+            "Basic": basic_stats,
+            "Advanced": advanced_stats
+        }
+        
+        team_games = data[data['team'] == selected_team].copy()
         team_games = team_games.sort_values(by='date', ascending=False)
         
         last_10 = team_games.head(10)
         
-        st.subheader(f"Last 10 Games Overview for {selected_team}")
+        for stat_type, stats_list in stat_groups.items():
+            st.subheader(f"Last 10 Games {stat_type} Stats for *{selected_team}*")
+            
+            # Keep only columns that exist
+            display_cols = [c for c in stats_list if c in last_10.columns]
+            
+            st.dataframe(
+                last_10[display_cols].style.format(precision=2),
+                width="stretch",
+                hide_index=True
+            )
+
         
-        # Basic box score columns (+ date, opponent)
-        display_cols = ['date','team','team_opp', 'pts', 'pts_opp','won',] 
-        
-        # Keep only columns that exist
-        display_cols = [c for c in display_cols if c in last_10.columns]
-        
-        st.dataframe(
-            last_10[display_cols].style.format(precision=2),
-            width="stretch",
-            hide_index=True
-        )
 
     # --- TAB 3: Historical Elo Tracker ---
     with tab3:
