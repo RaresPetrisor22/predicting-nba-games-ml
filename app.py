@@ -49,7 +49,7 @@ def get_logo_url(team_id):
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
     page_title="NBA Predictor Dashboard",
-    page_icon="🏀",
+    page_icon="assets/basketball-logo.png",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -59,14 +59,7 @@ st.markdown("""
     <style>
     /* Main body background */
     .stApp {
-        background-color: #F8F9FA;
-    }
-    
-    /* Headings */
-    h1, h2, h3 {
-        color: #1D428A; /* NBA Blue */
-        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        font-weight: 700;
+        background-color: #0F172A;
     }
     
     /* Tabs styling */
@@ -76,37 +69,44 @@ st.markdown("""
     .stTabs [data-baseweb="tab"] {
         height: 50px;
         white-space: pre-wrap;
-        background-color: #FFFFFF;
+        background-color: #1E293B;
         border-radius: 5px 5px 0 0;
         gap: 1px;
         padding-top: 10px;
         padding-bottom: 10px;
-        color: #1D428A;
-        border: 1px solid #dee2e6;
+        color: #94A3B8;
+        border: 1px solid #334155;
         border-bottom: none;
+        width: 160px;
     }
     .stTabs [aria-selected="true"] {
         background-color: #1D428A;
-        color: white !important;
-        border-top: 3px solid #C8102E; /* NBA Red */
+        color: #F8FAFC !important;
+        border-top: 4px solid #1D428A; /* Muted blue border */
+    }
+    .stTabs [data-baseweb="tab-highlight"] {
+        height: 3.5px;
+        background-color: #1D428A;
+        margin-left: 1px;
     }
     
     /* Metric Cards */
     div[data-testid="stMetricValue"] {
-        color: #C8102E; /* NBA Red */
+        color: #FCBF49; 
         font-size: 2rem;
         font-weight: bold;
     }
     div[data-testid="stMetricLabel"] {
-        color: #1D428A; /* NBA Blue */
+        color: #94A3B8; /* Cool Gray */
         font-size: 1.1rem;
         font-weight: bold;
     }
     .metric-container {
-        background-color: white;
+        background-color: #1E293B;
         border-radius: 8px;
         padding: 15px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+        border: 1px solid #334155;
         border-top: 4px solid #1D428A;
         margin-bottom: 15px;
     }
@@ -115,14 +115,26 @@ st.markdown("""
     .stDataFrame {
         border-radius: 8px;
         overflow: hidden;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        box-shadow: 0 4px 6px rgba(0,0,0,0.5);
     }
     
     /* Selectbox */
     .stSelectbox label {
-        color: #1D428A;
+        color: #F8FAFC;
         font-weight: bold;
     }
+    /* Hide the entire top toolbar (hamburger menu, deploy button, etc.) */
+    [data-testid="stToolbar"] {
+        visibility: hidden !important;
+        display: none !important;
+    }
+
+    /* Hide the colored decoration bar at the very top of the screen */
+    [data-testid="stDecoration"] {
+        visibility: hidden !important;
+        display: none !important;
+    }
+
     </style>
 """, unsafe_allow_html=True)
 
@@ -154,8 +166,28 @@ def load_and_process_data():
 
 # --- MAIN APP ---
 def main():
-    st.title("🏀 NBA Predictor Dashboard")
-    st.markdown("An interactive dashboard for the NBA Machine Learning predictive pipeline.")
+    # Load and encode logo for sharp, centered display
+    import base64
+    def get_base64_image(path):
+        with open(path, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+
+    logo_b64 = get_base64_image("assets/basketball-logo.png")
+    
+    st.markdown(
+        f"""
+        <div style="display: flex; align-items: center; gap: 18px; margin-bottom: 25px;">
+            <img src="data:image/png;base64,{logo_b64}" style="width: 48px; height: 48px; object-fit: contain;">
+            <h1 style="margin: 0; padding: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 700; color: #F8FAFC;">
+                Basketball ML Prediction Dashboard
+            </h1>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    st.markdown("""
+    **An automated, end-to-end Machine Learning pipeline for forecasting NBA matchups.** This dashboard serves **live win probabilities** powered by a Logistic Regression model. Behind the scenes, a cloud-hosted web scraper updates the database daily, engineering custom features like **10-game rolling averages** and **dynamic Elo ratings** to predict tonight's games.
+    """)
     
     try:
         df = load_and_process_data()
@@ -169,7 +201,7 @@ def main():
     # Create Tabs
     tab1, tab2, tab3 = st.tabs([
         "Tonight's Predictions", 
-        "Team Analytics (Last 10 Games)", 
+        "Team Analytics", 
         "Historical Elo Tracker"
     ])
 
@@ -218,7 +250,7 @@ def main():
                 is_home_winner = float(match['home_prob']) > float(match['away_prob'])
                 
                 # Side-aware styles for the winner badge
-                winner_bg_rgba = "rgba(210, 43, 43, 0.95)"
+                winner_bg_rgba = "rgba(214, 40, 40, 0.80)"
                 badge_base_style = f"background-color: {winner_bg_rgba}; color: white; padding: 2px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: bold; vertical-align: middle; white-space: nowrap;"
                 
                 home_winner_badge = f'<span style="{badge_base_style} margin-left: 12px;">EXPECTED WINNER</span>'
@@ -231,25 +263,25 @@ def main():
     <div style="display: flex; align-items: center; width: 40%;">
         <img src="{get_logo_url(home_info['id'])}" style="height: 70px; margin-right: 15px;">
         <div>
-            <div style="color: #1D428A; font-size: 1.2rem; font-weight: bold; display: flex; align-items: center;">
+            <div style="color: #F8FAFC; font-size: 1.2rem; font-weight: bold; display: flex; align-items: center;">
                 {home_info['name']} {home_winner_badge if is_home_winner else ''}
             </div>
-            <div style="color: #C8102E; font-size: 2.2rem; font-weight: bold;">{match['home_prob']}%</div>
+            <div style="color: #FCBF49; font-size: 2.2rem; font-weight: bold;">{match['home_prob']}%</div>
         </div>
     </div>
     
 <!-- VS -->
 <div style="width: 20%; text-align: center;">
-        <h3 style="color: #1D428A; margin: 0; font-size: 2.5rem; letter-spacing: 2px;">VS</h3>
+        <h3 style="color: #94A3B8; margin: 0; font-size: 2.5rem; letter-spacing: 2px;">VS</h3>
 </div>
     
 <!-- Away Team -->
 <div style="display: flex; align-items: center; justify-content: flex-end; width: 40%; text-align: right;">
     <div>
-        <div style="color: #1D428A; font-size: 1.2rem; font-weight: bold; display: flex; align-items: center; justify-content: flex-end;">
+        <div style="color: #F8FAFC; font-size: 1.2rem; font-weight: bold; display: flex; align-items: center; justify-content: flex-end;">
             {'' if is_home_winner else away_winner_badge} {away_info['name']}
         </div>
-        <div style="color: #C8102E; font-size: 2.2rem; font-weight: bold;">{match['away_prob']}%</div>
+        <div style="color: #FCBF49; font-size: 2.2rem; font-weight: bold;">{match['away_prob']}%</div>
     </div>
     <img src="{get_logo_url(away_info['id'])}" style="height: 70px; margin-left: 15px;">
 </div>
@@ -262,18 +294,18 @@ def main():
 
                 def stat_colors(col, home_val, away_val):
                     """Return (home_color, away_color) based on which value is better."""
-                    GREEN = "#27AE60"
-                    BLUE  = "#1D428A"
+                    GREEN = "#4ADE80"
+                    GRAY  = "#94A3B8"
                     if home_val is None or away_val is None:
-                        return BLUE, BLUE
+                        return GRAY, GRAY
                     if home_val == away_val:
-                        return BLUE, BLUE
+                        return GRAY, GRAY
                     lower_wins = col in LOWER_IS_BETTER
                     home_better = (home_val < away_val) if lower_wins else (home_val > away_val)
                     if home_better:
-                        return GREEN, BLUE
+                        return GREEN, GRAY
                     else:
-                        return BLUE, GREEN
+                        return GRAY, GREEN
 
                 # --- Expandable stats dropdown ---
                 with st.expander("Last 10 Games Averages"):
@@ -283,7 +315,7 @@ def main():
                     # Centered title inside the expander
                     st.markdown(
                         f"<div style='display:flex; justify-content:center; align-items:center; "
-                        f"color:#1D428A; font-size:1.05rem; font-weight:bold; padding: 4px 0 16px 0; gap:16px;'>"
+                        f"color:#F8FAFC; font-size:1.05rem; font-weight:bold; padding: 4px 0 16px 0; gap:16px;'>"
                         f"<img src='{get_logo_url(home_info['id'])}' style='height:32px; vertical-align:middle;'>"
                         f"<span>{home_info['name']}</span>"
                         f"<span></span>"
@@ -303,8 +335,8 @@ def main():
                             formatted = f"{h_val:.1f}" if h_val is not None else "N/A"
                             st.markdown(
                                 f"<div style='display:flex; justify-content:space-between; padding:6px 10px; "
-                                f"border-bottom:1px solid #EEF0F3;'>"
-                                f"<span style='color:#555; font-size:0.9rem;'>{label}</span>"
+                                f"border-bottom:1px solid #334155;'>"
+                                f"<span style='color:#94A3B8; font-size:0.9rem;'>{label}</span>"
                                 f"<span style='color:{home_color}; font-weight:bold; font-size:0.9rem;'>{formatted}</span>"
                                 f"</div>",
                                 unsafe_allow_html=True
@@ -315,7 +347,7 @@ def main():
                         st.markdown(
                             "<div style='display:flex; flex-direction:column; align-items:center; "
                             "height:100%; padding-top:40px;'>"
-                            "<div style='width:2px; background:linear-gradient(to bottom, transparent, #1D428A88, transparent); "
+                            "<div style='width:2px; background:linear-gradient(to bottom, transparent, #334155, transparent); "
                             "flex:1; min-height:300px;'></div>"
                             "</div>",
                             unsafe_allow_html=True
@@ -329,9 +361,9 @@ def main():
                             formatted = f"{a_val:.1f}" if a_val is not None else "N/A"
                             st.markdown(
                                 f"<div style='display:flex; justify-content:space-between; padding:6px 10px; "
-                                f"border-bottom:1px solid #EEF0F3;'>"
+                                f"border-bottom:1px solid #334155;'>"
                                 f"<span style='color:{away_color}; font-weight:bold; font-size:0.9rem;'>{formatted}</span>"
-                                f"<span style='color:#555; font-size:0.9rem;'>{label}</span>"
+                                f"<span style='color:#94A3B8; font-size:0.9rem;'>{label}</span>"
                                 f"</div>",
                                 unsafe_allow_html=True
                             )
@@ -406,15 +438,15 @@ def main():
             y='Team_Elo',
             title=f"Historical Elo Rating for {selected_team_elo}",
             labels={'date': 'Date', 'Team_Elo': 'Elo Rating'},
-            color_discrete_sequence=['#C8102E'] # NBA Red
+            color_discrete_sequence=['#FCBF49'] 
         )
         
         fig.update_layout(
-            plot_bgcolor='white',
-            paper_bgcolor='white',
-            font=dict(family="Helvetica Neue", color="#1D428A"),
-            xaxis=dict(showgrid=True, gridcolor='#E2E8F0'),
-            yaxis=dict(showgrid=True, gridcolor='#E2E8F0'),
+            plot_bgcolor='#1E293B',
+            paper_bgcolor='#1E293B',
+            font=dict(family="Helvetica Neue", color="#F8FAFC"),
+            xaxis=dict(showgrid=True, gridcolor='#334155'),
+            yaxis=dict(showgrid=True, gridcolor='#334155'),
             hovermode="x unified"
         )
         
