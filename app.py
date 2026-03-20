@@ -168,9 +168,9 @@ def main():
 
     # Create Tabs
     tab1, tab2, tab3 = st.tabs([
-        "📅 Tonight's Predictions", 
-        "📊 Team Analytics (Last 10 Games)", 
-        "📈 Historical Elo Tracker"
+        "Tonight's Predictions", 
+        "Team Analytics (Last 10 Games)", 
+        "Historical Elo Tracker"
     ])
 
     # --- TAB 1: Tonight's Predictions ---
@@ -180,7 +180,31 @@ def main():
         
         with st.spinner("Fetching tonight's matchups and running predictions..."):
             matchups = predict_tonight()
-        
+
+        # Key stats to surface in the breakdown (roll10 column suffix → display name)
+        KEY_STATS = [
+            ('pts_roll10',   'Points'),
+            ('fg%_roll10',   'FG%'),
+            ('3p%_roll10',   '3P%'),
+            ('ft%_roll10',   'FT%'),
+            ('ast_roll10',   'Assists'),
+            ('trb_roll10',   'Rebounds'),
+            ('stl_roll10',   'Steals'),
+            ('blk_roll10',   'Blocks'),
+            ('tov_roll10',   'Turnovers'),
+            ('ortg_roll10',  'Off. Rating'),
+            ('drtg_roll10',  'Def. Rating'),
+            ('won_roll10',   'Win Rate'),
+        ]
+
+        def get_team_last10_stats(team_abbr):
+            """Return latest row of roll10 stats for a team."""
+            team_rows = df[df['team'] == team_abbr].sort_values('date')
+            if team_rows.empty:
+                return {}
+            latest = team_rows.iloc[-1]
+            return {col: latest[col] for col, _ in KEY_STATS if col in latest.index}
+
         if not matchups:
             st.info("No games scheduled for today. See you tomorrow!")
         else:
@@ -190,6 +214,16 @@ def main():
                 home_info = NBA_TEAMS.get(home_abbr, {'name': home_abbr, 'id': ''})
                 away_info = NBA_TEAMS.get(away_abbr, {'name': away_abbr, 'id': ''})
                 
+                # Determine expected winner for inline display
+                is_home_winner = float(match['home_prob']) > float(match['away_prob'])
+                
+                # Side-aware styles for the winner badge
+                winner_bg_rgba = "rgba(210, 43, 43, 0.95)"
+                badge_base_style = f"background-color: {winner_bg_rgba}; color: white; padding: 2px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: bold; vertical-align: middle; white-space: nowrap;"
+                
+                home_winner_badge = f'<span style="{badge_base_style} margin-left: 12px;">EXPECTED WINNER</span>'
+                away_winner_badge = f'<span style="{badge_base_style} margin-right: 12px;">EXPECTED WINNER</span>'
+                
                 # Use dedented HTML to avoid Markdown treating it as a code block (due to leading spaces)
                 match_html = f"""
 <div class="metric-container" style="display: flex; justify-content: space-between; align-items: center; padding: 20px;">
@@ -197,20 +231,24 @@ def main():
     <div style="display: flex; align-items: center; width: 40%;">
         <img src="{get_logo_url(home_info['id'])}" style="height: 70px; margin-right: 15px;">
         <div>
-            <div style="color: #1D428A; font-size: 1.2rem; font-weight: bold;">{home_info['name']}</div>
+            <div style="color: #1D428A; font-size: 1.2rem; font-weight: bold; display: flex; align-items: center;">
+                {home_info['name']} {home_winner_badge if is_home_winner else ''}
+            </div>
             <div style="color: #C8102E; font-size: 2.2rem; font-weight: bold;">{match['home_prob']}%</div>
         </div>
     </div>
     
 <!-- VS -->
 <div style="width: 20%; text-align: center;">
-        <h3 style="color: #1D428A; margin: 0; font-size: 1.5rem;">VS</h3>
+        <h3 style="color: #1D428A; margin: 0; font-size: 2.5rem; letter-spacing: 2px;">VS</h3>
 </div>
     
 <!-- Away Team -->
 <div style="display: flex; align-items: center; justify-content: flex-end; width: 40%; text-align: right;">
     <div>
-        <div style="color: #1D428A; font-size: 1.2rem; font-weight: bold;">{away_info['name']}</div>
+        <div style="color: #1D428A; font-size: 1.2rem; font-weight: bold; display: flex; align-items: center; justify-content: flex-end;">
+            {'' if is_home_winner else away_winner_badge} {away_info['name']}
+        </div>
         <div style="color: #C8102E; font-size: 2.2rem; font-weight: bold;">{match['away_prob']}%</div>
     </div>
     <img src="{get_logo_url(away_info['id'])}" style="height: 70px; margin-left: 15px;">
@@ -218,6 +256,86 @@ def main():
 </div>
 """
                 st.markdown(match_html, unsafe_allow_html=True)
+
+                # Stats where LOWER is better
+                LOWER_IS_BETTER = {'tov_roll10', 'drtg_roll10'}
+
+                def stat_colors(col, home_val, away_val):
+                    """Return (home_color, away_color) based on which value is better."""
+                    GREEN = "#27AE60"
+                    BLUE  = "#1D428A"
+                    if home_val is None or away_val is None:
+                        return BLUE, BLUE
+                    if home_val == away_val:
+                        return BLUE, BLUE
+                    lower_wins = col in LOWER_IS_BETTER
+                    home_better = (home_val < away_val) if lower_wins else (home_val > away_val)
+                    if home_better:
+                        return GREEN, BLUE
+                    else:
+                        return BLUE, GREEN
+
+                # --- Expandable stats dropdown ---
+                with st.expander("Last 10 Games Averages"):
+                    home_stats = get_team_last10_stats(home_abbr)
+                    away_stats = get_team_last10_stats(away_abbr)
+
+                    # Centered title inside the expander
+                    st.markdown(
+                        f"<div style='display:flex; justify-content:center; align-items:center; "
+                        f"color:#1D428A; font-size:1.05rem; font-weight:bold; padding: 4px 0 16px 0; gap:16px;'>"
+                        f"<img src='{get_logo_url(home_info['id'])}' style='height:32px; vertical-align:middle;'>"
+                        f"<span>{home_info['name']}</span>"
+                        f"<span></span>"
+                        f"<span>{away_info['name']}</span>"
+                        f"<img src='{get_logo_url(away_info['id'])}' style='height:32px; vertical-align:middle;'>"
+                        f"</div>",
+                        unsafe_allow_html=True
+                    )
+
+                    col_home, col_mid, col_away = st.columns([5, 1, 5])
+
+                    with col_home:
+                        for col, label in KEY_STATS:
+                            h_val = home_stats.get(col)
+                            a_val = away_stats.get(col)
+                            home_color, _ = stat_colors(col, h_val, a_val)
+                            formatted = f"{h_val:.1f}" if h_val is not None else "N/A"
+                            st.markdown(
+                                f"<div style='display:flex; justify-content:space-between; padding:6px 10px; "
+                                f"border-bottom:1px solid #EEF0F3;'>"
+                                f"<span style='color:#555; font-size:0.9rem;'>{label}</span>"
+                                f"<span style='color:{home_color}; font-weight:bold; font-size:0.9rem;'>{formatted}</span>"
+                                f"</div>",
+                                unsafe_allow_html=True
+                            )
+
+                    with col_mid:
+                        # Centered vertical divider
+                        st.markdown(
+                            "<div style='display:flex; flex-direction:column; align-items:center; "
+                            "height:100%; padding-top:40px;'>"
+                            "<div style='width:2px; background:linear-gradient(to bottom, transparent, #1D428A88, transparent); "
+                            "flex:1; min-height:300px;'></div>"
+                            "</div>",
+                            unsafe_allow_html=True
+                        )
+
+                    with col_away:
+                        for col, label in KEY_STATS:
+                            h_val = home_stats.get(col)
+                            a_val = away_stats.get(col)
+                            _, away_color = stat_colors(col, h_val, a_val)
+                            formatted = f"{a_val:.1f}" if a_val is not None else "N/A"
+                            st.markdown(
+                                f"<div style='display:flex; justify-content:space-between; padding:6px 10px; "
+                                f"border-bottom:1px solid #EEF0F3;'>"
+                                f"<span style='color:{away_color}; font-weight:bold; font-size:0.9rem;'>{formatted}</span>"
+                                f"<span style='color:#555; font-size:0.9rem;'>{label}</span>"
+                                f"</div>",
+                                unsafe_allow_html=True
+                            )
+
 
     # --- TAB 2: Team Analytics ---
     with tab2:
@@ -246,7 +364,7 @@ def main():
         
         st.dataframe(
             last_10[display_cols].style.format(precision=2),
-            use_container_width=True,
+            width="stretch",
             hide_index=True
         )
 
@@ -300,7 +418,7 @@ def main():
             hovermode="x unified"
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
 if __name__ == "__main__":
     main()
