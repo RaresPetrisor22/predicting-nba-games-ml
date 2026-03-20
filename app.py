@@ -373,7 +373,7 @@ def main():
     with tab2:
         st.header("Team Analytics")
         
-        selected_team = st.selectbox("Select a Team:", all_teams, key="team_select_analytics")
+        selected_team = st.selectbox("Select a Team:", all_teams, format_func=lambda x: NBA_TEAMS[x]["name"],key="team_select_analytics")
         
         # Filter games where the selected team is playing (either home or away)
         # Note: The dataframe from `compute_rolling_averages` dropped `total`, etc.
@@ -385,11 +385,8 @@ def main():
         
         st.subheader(f"Last 10 Games Overview for {selected_team}")
         
-        # Find rolling average columns
-        roll_cols = [c for c in df.columns if "roll10" in c and "opp" not in c]
-        
         # Basic box score columns (+ date, opponent)
-        display_cols = ['date', 'team_opp', 'won', 'pts', 'pts_opp'] + roll_cols
+        display_cols = ['date','team','team_opp', 'pts', 'pts_opp','won',] 
         
         # Keep only columns that exist
         display_cols = [c for c in display_cols if c in last_10.columns]
