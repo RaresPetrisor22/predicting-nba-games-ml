@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 # Import custom feature engineering functions
 from src.features.feature_engineer import load_raw_data
 from scripts.predict_tonight import predict_tonight
+from src.model.feature_importance import get_feature_importance
 
 # --- TEAM DICTIONARY ---
 NBA_TEAMS = {
@@ -564,7 +565,72 @@ def main():
     # --- TAB 4: Model Performance ---
     with tab4:
         st.header("Model Performance")
-        st.info("Model evaluation and performance metrics will go here.")
+        st.markdown(
+            """
+            <div style="background-color: #1E293B; border-left: 4px solid #FCBF49; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+                <h3 style="color: #F8FAFC; margin-top: 0; margin-bottom: 12px; font-size: 1.25rem;">Model Architecture</h3>
+                <p style="color: #94A3B8; font-size: 1.05rem; line-height: 1.6;">
+                    The predictions are powered by a <strong style="color: #FCBF49;">Logistic Regression</strong> model. 
+                    This model has been trained on a deep dataset of historical matchups spanning from the <strong style="color: #FCBF49;">2015 season</strong> until the present moment.
+                </p>
+                <p style="color: #94A3B8; font-size: 1.05rem; line-height: 1.6;">
+                    To evaluate how the algorithm handles unseen future games, we split the data sequentially using an 
+                    <strong style="color: #FCBF49;">80/20 Time Series Split</strong>. On the chronological test set, the model achieved a stable baseline accuracy of <strong style="color: #FCBF49;">66.05%</strong>!
+                </p>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
+
+        @st.cache_data(ttl=21600)
+        def get_cached_feature_importance():
+            return get_feature_importance()
+        
+        feature_importance_df = get_cached_feature_importance()
+        
+        if feature_importance_df is not None and not feature_importance_df.empty:
+            feature_importance_df = feature_importance_df.sort_values(by='Abs_Weight', ascending=True)
+            
+
+            fig = px.bar(
+                feature_importance_df, 
+                x='Weight', 
+                y='Feature', 
+                orientation='h',
+                color='Weight',
+                color_continuous_scale=[
+                    [0.00, '#ef4444'],  
+                    [0.25, '#b91c1c'],  
+                    [0.49, '#7f1d1d'],  
+                    [0.51, '#14532d'],  
+                    [0.75, '#15803d'],  
+                    [1.00, '#22c55e']   
+                ],
+                color_continuous_midpoint=0
+            )
+            fig.update_coloraxes(showscale=False)
+            
+            fig.update_traces(marker_line_width=0)
+            
+            fig.update_layout(
+                plot_bgcolor='#0F172A',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='#F8FAFC'),
+                showlegend=False,
+                title="Top 15 Feature Importances",
+                xaxis_title="Weight",
+                yaxis_title="Feature",
+                xaxis=dict(showgrid=True, gridcolor='#334155', gridwidth=1),
+                yaxis=dict(showgrid=False)
+            )
+            
+            fig.add_vline(x=0, line_dash="dash", line_color="#F8FAFC", line_width=1.5, opacity=0.7)
+            
+            st.plotly_chart(fig, use_container_width=True)
+
+            with st.expander("Feature Naming Legend"):
+                st.write("**`_opp_roll10`**: Stats the team allowed against their opponents. (e.g. last 10 games average for opponent points allowed)")
+                st.write("**`_roll10_opp_history`**: Averages for the opposing team they are facing.")
 
 
 if __name__ == "__main__":
