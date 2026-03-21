@@ -421,7 +421,7 @@ def main():
             st.dataframe(
                 styled_df,
                 column_config=col_cfg,
-                use_container_width=True,
+                width='stretch',
                 hide_index=True,
             )
 
@@ -626,7 +626,7 @@ def main():
             
             fig.add_vline(x=0, line_dash="dash", line_color="#F8FAFC", line_width=1.5, opacity=0.7)
             
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
             with st.expander("Feature Naming Legend"):
                 st.write("**`_opp_roll10`**: Stats the team allowed against their opponents. (e.g. last 10 games average for opponent points allowed)")

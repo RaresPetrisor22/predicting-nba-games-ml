@@ -13,7 +13,7 @@ def get_feature_importance():
 
     df = build_features('data/nba_games.csv')
     X, _ = prepare_training_data(df)
-    features = list(X.columns) # <-- REPLACE WITH YOUR ACTUAL LIST
+    features = list(X.columns) 
 
     importance_df = pd.DataFrame({
         'Feature': features,
