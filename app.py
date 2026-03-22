@@ -95,12 +95,12 @@ st.markdown("""
     /* Metric Cards */
     div[data-testid="stMetricValue"] {
         color: #FCBF49; 
-        font-size: 2rem;
+        font-size: 2.4rem;
         font-weight: bold;
     }
     div[data-testid="stMetricLabel"] {
         color: #94A3B8; /* Cool Gray */
-        font-size: 1.1rem;
+        font-size: 1.3rem;
         font-weight: bold;
     }
     .metric-container {
@@ -160,7 +160,7 @@ def main():
         f"""
         <div style="display: flex; align-items: center; gap: 18px; margin-bottom: 25px;">
             <img src="data:image/png;base64,{logo_b64}" style="width: 48px; height: 48px; object-fit: contain;">
-            <h1 style="margin: 0; padding: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 700; color: #FCBF49;">
+            <h1 style="margin: 0; padding: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 700; color: #FFFFF0;">
                 Basketball ML Prediction Dashboard
             </h1>
         </div>
@@ -565,22 +565,105 @@ def main():
     # --- TAB 4: Model Performance ---
     with tab4:
         st.header("Model Performance")
-        st.markdown(
-            """
-            <div style="background-color: #1E293B; border-left: 4px solid #FCBF49; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
-                <h3 style="color: #F8FAFC; margin-top: 0; margin-bottom: 12px; font-size: 1.25rem;">Model Architecture</h3>
-                <p style="color: #94A3B8; font-size: 1.05rem; line-height: 1.6;">
-                    The predictions are powered by a <strong style="color: #FCBF49;">Logistic Regression</strong> model. 
-                    This model has been trained on a deep dataset of historical matchups spanning from the <strong style="color: #FCBF49;">2015 season</strong> until the present moment.
-                </p>
-                <p style="color: #94A3B8; font-size: 1.05rem; line-height: 1.6;">
-                    To evaluate how the algorithm handles unseen future games, we split the data sequentially using an 
-                    <strong style="color: #FCBF49;">80/20 Time Series Split</strong>. On the chronological test set, the model achieved a stable baseline accuracy of <strong style="color: #FCBF49;">66.05%</strong>!
-                </p>
-            </div>
-            """, 
-            unsafe_allow_html=True
-        )
+
+        from src.model.model_metrics import get_model_metrics
+
+        @st.cache_data(ttl=21600)
+        def get_cached_model_metrics():
+            return get_model_metrics()
+
+        acc, loss, cm, prob_true, prob_pred = get_cached_model_metrics()
+
+        kpi_col1, kpi_col2, kpi_col3 = st.columns([1, 1, 1.8])
+        with kpi_col1:
+            st.markdown(
+                f"""
+                <div style="background-color: #1E293B; border-radius: 10px; padding: 20px; border: 1px solid #334155; box-shadow: 0 4px 6px rgba(0,0,0,0.3); height: 135px; display: flex; flex-direction: column; justify-content: center;">
+                    <div style="color: #94A3B8; font-size: 1.1rem; margin-bottom: 8px;">Accuracy on the 2026 Regular Season</div>
+                    <div style="color: #FCBF49; font-size: 2rem; font-weight: bold;">{acc * 100:.2f}%</div>
+                </div>
+                """, unsafe_allow_html=True
+            )
+        with kpi_col2:
+            st.markdown(
+                f"""
+                <div style="background-color: #1E293B; border-radius: 10px; padding: 20px; border: 1px solid #334155; box-shadow: 0 4px 6px rgba(0,0,0,0.3); height: 135px; display: flex; flex-direction: column; justify-content: center;">
+                    <div style="color: #94A3B8; font-size: 1.1rem; margin-bottom: 8px;">Log Loss (Cross-entropy)</div>
+                    <div style="color: #FCBF49; font-size: 2rem; font-weight: bold;">{loss:.3f}</div>
+                </div>
+                """, unsafe_allow_html=True
+            )
+        with kpi_col3:
+            num_training_games = len(df[df['season'] < 2026])
+            num_features = len(df.columns)
+            st.markdown(
+                f"""
+                <div style="background-color: #1E293B; border-radius: 10px; padding: 18px 20px; border: 1px solid #334155; border-left: 4px solid #FCBF49; box-shadow: 0 4px 6px rgba(0,0,0,0.3); height: 135px; display: flex; flex-direction: column; justify-content: center;">
+                    <div style="color: #F8FAFC; font-size: 0.98rem; line-height: 1.55;">
+                        Trained on data from the <strong style="color: #FCBF49;">2015 to 2025</strong> seasons 
+                        (totaling <strong style="color: #FCBF49;">{num_training_games:,}</strong> games from the home team perspective, using <strong style="color: #FCBF49;">{num_features}</strong> features), 
+                        making out-of-sample predictions on the <strong style="color: #FCBF49;">2026</strong> season.
+                    </div>
+                </div>
+                """, unsafe_allow_html=True
+            )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        chart_col1, chart_col2 = st.columns(2)
+
+        with chart_col1:
+            fig_cm = px.imshow(
+                cm, 
+                text_auto=True, 
+                aspect="auto", 
+                labels=dict(x="Model prediction", y="Actual outcome", color="Count"),
+                x=['Loss (0)', 'Win (1)'],
+                y=['Loss (0)', 'Win (1)'],
+                title="Confusion Matrix",
+                color_continuous_scale=['#F8FAFC', '#FEF08A', '#D4AF37']
+            )
+            fig_cm.update_layout(
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='#F8FAFC'),
+                title_font=dict(color='#F8FAFC', size=16),
+                coloraxis_colorbar=dict(title="Count", tickfont=dict(color="#F8FAFC")),
+                xaxis=dict(showgrid=False, linecolor='#94A3B8'),
+                yaxis=dict(showgrid=False, linecolor='#94A3B8')
+            )
+            st.plotly_chart(fig_cm, width='stretch')
+
+        with chart_col2:
+            import plotly.graph_objects as go
+            fig_cal = go.Figure()
+            
+            fig_cal.add_trace(go.Scatter(
+                x=[0, 1], y=[0, 1], 
+                mode='lines', 
+                line=dict(dash='dash', color='#94A3B8'), 
+                name='Perfectly Calibrated'
+            ))
+            
+            fig_cal.add_trace(go.Scatter(
+                x=prob_pred, y=prob_true, 
+                mode='lines+markers', 
+                line=dict(color='#D4AF37', width=3), 
+                marker=dict(size=8, color='#D4AF37'), 
+                name='NBA Model'
+            ))
+            
+            fig_cal.update_layout(
+                title=dict(text="Calibration Curve", font=dict(color='#F8FAFC', size=16)),
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='#F8FAFC'),
+                xaxis=dict(title="Average Predicted Probability", showgrid=True, gridcolor='#334155', linecolor='#94A3B8', zeroline=False),
+                yaxis=dict(title="True Fraction of Wins", showgrid=True, gridcolor='#334155', linecolor='#94A3B8', zeroline=False),
+                legend=dict(font=dict(color='#F8FAFC'), bgcolor='rgba(0,0,0,0)', yanchor="top", y=0.99, xanchor="left", x=0.01)
+            )
+            st.plotly_chart(fig_cal, width='stretch')
+
+        st.markdown("<hr style='border: 1px solid #334155; margin: 30px 0;'>", unsafe_allow_html=True)
 
         @st.cache_data(ttl=21600)
         def get_cached_feature_importance():
