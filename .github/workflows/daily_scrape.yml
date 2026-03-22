@@ -1,4 +1,4 @@
-name: Daily NBA Data Scraper
+name: Daily NBA Data Update
 
 on:
   schedule:
@@ -24,7 +24,9 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run Scraper Script
-        run: python -m scripts.scrape_games
+        run: |
+          python -m scripts.scrape_games
+          python -m scripts.predict_tonight
 
       - name: Commit and push changes
         run: |

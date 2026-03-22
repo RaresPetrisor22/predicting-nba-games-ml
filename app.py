@@ -176,9 +176,11 @@ def main():
         df = load_raw_data(path)
         return df
 
-    @st.cache_data(ttl=21600)
+    @st.cache_data()
     def get_cached_predictions():
-        return predict_tonight()
+        preds_df = pd.read_csv("data/predictions.csv")
+        new_games = preds_df[preds_df['actual'] == -1]
+        return new_games.to_dict(orient="records")
     
     df = get_cached_data("data/nba_games_processed.csv")
     all_teams = sorted(list(df['team'].unique()))
@@ -227,13 +229,13 @@ def main():
             st.info("No games scheduled for today. See you tomorrow!")
         else:
             for match in matchups:
-                home_abbr = match['home']
-                away_abbr = match['away']
+                home_abbr = match['team']
+                away_abbr = match['team_opp']
                 home_info = NBA_TEAMS.get(home_abbr, {'name': home_abbr, 'id': ''})
                 away_info = NBA_TEAMS.get(away_abbr, {'name': away_abbr, 'id': ''})
                 
                 # Determine expected winner for inline display
-                is_home_winner = float(match['home_prob']) > float(match['away_prob'])
+                is_home_winner = float(match['home_prob_win']) > float(match['away_prob_win'])
                 
                 # Side-aware styles for the winner badge
                 winner_bg_rgba = "rgba(214, 40, 40, 0.80)"
@@ -252,7 +254,7 @@ def main():
             <div style="color: #F8FAFC; font-size: 1.2rem; font-weight: bold; display: flex; align-items: center;">
                 {home_info['name']} {home_winner_badge if is_home_winner else ''}
             </div>
-            <div style="color: #FCBF49; font-size: 2.2rem; font-weight: bold;">{match['home_prob']}%</div>
+            <div style="color: #FCBF49; font-size: 2.2rem; font-weight: bold;">{float(match['home_prob_win']):.2%}</div>
         </div>
     </div>
     
@@ -267,7 +269,7 @@ def main():
         <div style="color: #F8FAFC; font-size: 1.2rem; font-weight: bold; display: flex; align-items: center; justify-content: flex-end;">
             {'' if is_home_winner else away_winner_badge} {away_info['name']}
         </div>
-        <div style="color: #FCBF49; font-size: 2.2rem; font-weight: bold;">{match['away_prob']}%</div>
+        <div style="color: #FCBF49; font-size: 2.2rem; font-weight: bold;">{float(match['away_prob_win']):.2%}</div>
     </div>
     <img src="{get_logo_url(away_info['id'])}" style="height: 70px; margin-left: 15px;">
 </div>

@@ -1,28 +1,10 @@
 import pandas as pd
 import joblib
-from datetime import datetime
+import os
 from src.scraping.scraper import scrape_upcoming_games
 from src.features.feature_engineer import build_features
 from src.model.train import prepare_training_data
 from src.scraping.scraper import ACTIVE_SEASON
-
-def display_results(results_df,probabilities):
-    results = []
-    for i, (_,row) in enumerate(results_df.iterrows()):
-        home_team = row["team"]
-        away_team = row["team_opp"]
-        
-        # Index 1 is the probability of the '1' class (which means the Home team wins)
-        home_win_prob = probabilities[i][1] * 100
-        away_win_prob = probabilities[i][0] * 100
-        
-        results.append({
-            "home": home_team,
-            "away": away_team,
-            "home_prob": round(home_win_prob, 1),
-            "away_prob": round(away_win_prob, 1)
-        })
-    return results
 
 def predict_tonight():
     print("Fetching tonight's matchups...")
@@ -30,7 +12,7 @@ def predict_tonight():
     
     if not matchups:
         print("No games scheduled for today. See you tomorrow!")
-        return []
+        return
 
     df = pd.read_csv("data/nba_games.csv",index_col=0)
     
@@ -55,18 +37,23 @@ def predict_tonight():
     
     pipeline = joblib.load("model_pipeline.pkl")
     
-    print("\n" + "="*40)
-    print(f"🏀 PREDICTIONS FOR {datetime.now().strftime('%Y-%m-%d')} 🏀")
-    print("="*40)
-
     probabilities = pipeline.predict_proba(X_tonight)
-   
-    return display_results(tonight_features_df,probabilities)
+
+    preds_df = tonight_features_df[['id', 'date', 'team', 'team_opp']]
+    preds_df['home_prob_win'] = probabilities[:,1]
+    preds_df['away_prob_win'] = probabilities[:,0]
+    preds_df['actual'] = -1
+
+
+    if "predictions.csv" not in os.listdir("data"):
+        preds_df.to_csv("data/predictions.csv", index=False)
+    else:
+        old_preds = pd.read_csv("data/predictions.csv")
+        all_preds = pd.concat([old_preds, preds_df], ignore_index=True)
+        if all_preds.duplicated().any():
+            print("Games found already in predictions.csv. Skipping...")
+            return
+        preds_df.to_csv("data/predictions.csv", mode="a", header=False, index=False)
 
 if __name__ == "__main__":
-    preds = predict_tonight()
-    for p in preds:
-        print(f"{p['home']} (Home) vs {p['away']} (Away)")
-        print(f"  -> {p['home']} Win Probability: {p['home_prob']:.1f}%")
-        print(f"  -> {p['away']} Win Probability: {p['away_prob']:.1f}%")
-        print("-" * 40)
+    predict_tonight()
