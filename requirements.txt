@@ -1,5 +1,5 @@
 pandas
-scikit-learn==1.8.0
+scikit-learn==1.7.2
 beautifulsoup4
 lxml
 joblib
