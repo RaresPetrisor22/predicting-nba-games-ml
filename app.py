@@ -434,7 +434,7 @@ def main():
         st.header("Historical Elo Tracker")
         
         selected_teams_elo = st.multiselect("Select Teams to Compare:", all_teams, 
-                                            default=['BOS', 'LAL'], # Default to a classic rivalry
+                                            default=['OKC', 'IND'], # Default to a classic rivalry
                                             format_func=lambda x: NBA_TEAMS[x]["name"], 
                                             key="team_select_elo")
         
@@ -568,7 +568,7 @@ def main():
     with tab4:
         st.header("Model Performance")
 
-        from src.model.model_metrics import get_model_metrics
+        from src.model.model_metrics import get_model_metrics, load_and_process_time_series
 
         @st.cache_data(ttl=21600)
         def get_cached_model_metrics():
@@ -716,6 +716,90 @@ def main():
             with st.expander("Feature Naming Legend"):
                 st.write("**`_opp_roll10`**: Stats the team allowed against their opponents. (e.g. last 10 games average for opponent points allowed)")
                 st.write("**`_roll10_opp_history`**: Averages for the opposing team they are facing.")
+
+        st.markdown("<hr style='border: 1px solid #334155; margin: 30px 0;'>", unsafe_allow_html=True)
+
+        st.subheader("Model Performance Over Time")
+
+        
+        
+        @st.cache_data()
+        def get_cached_time_series_plot():
+            return load_and_process_time_series()
+        
+        time_series_df = get_cached_time_series_plot()
+        
+        if time_series_df is not None and not time_series_df.empty:
+            # Create the plot
+            fig_ts = px.line(
+                time_series_df, 
+                x='Date', 
+                y=['Cumulative Accuracy', 'Cumulative Log Loss'],
+                color_discrete_map={
+                    'Cumulative Accuracy': '#D4AF37',
+                    'Cumulative Log Loss': '#D62828'
+                },
+                markers=True
+            )
+            
+            # Update layout for dark theme
+            fig_ts.update_layout(
+                plot_bgcolor='#0F172A',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='#F8FAFC'),
+                xaxis_title="Date",
+                yaxis_title="Metric Value",
+                legend_title="Metrics",
+                legend=dict(font=dict(color='#F8FAFC'), bgcolor='rgba(0,0,0,0)', yanchor="top", y=0.99, xanchor="left", x=0.01),
+                hovermode="x unified"
+            )
+            
+            # Add annotations for the latest values
+            latest_acc = time_series_df['Cumulative Accuracy'].iloc[-1]
+            latest_loss = time_series_df['Cumulative Log Loss'].iloc[-1]
+            
+            fig_ts.add_annotation(
+                x=time_series_df['Date'].iloc[-1],
+                y=latest_acc,
+                text=f"Accuracy: {latest_acc:.3f}",
+                showarrow=True,
+                arrowhead=2,
+                ax=0,
+                ay=-40,
+                font=dict(color='#F7F8F0', size=12),
+                bgcolor="rgba(0,0,0,0.7)",
+                bordercolor="#D4AF37",
+                borderwidth=1
+            )
+            
+            fig_ts.add_annotation(
+                x=time_series_df['Date'].iloc[-1],
+                y=latest_loss,
+                text=f"Log Loss: {latest_loss:.3f}",
+                showarrow=True,
+                arrowhead=2,
+                ax=0,
+                ay=40,
+                font=dict(color='#F7F8F0', size=12),
+                bgcolor="rgba(0,0,0,0.7)",
+                bordercolor="#D62828",
+                borderwidth=1
+            )
+            
+            st.plotly_chart(fig_ts, width='stretch')
+            
+            st.markdown("""
+            <div style="background-color: #1E293B; border-radius: 10px; padding: 20px; border: 1px solid #334155; margin-top: 20px;">
+                <h4 style="color: #F8FAFC; margin-top: 0;">How to Interpret This Chart</h4>
+                <ul style="color: #94A3B8; line-height: 1.8;">
+                    <li><strong>Cumulative Accuracy:</strong> The overall percentage of games the model has correctly predicted from <strong>23/03/2026</strong> to the current date.</li>
+                    <li><strong>Cumulative Log Loss:</strong> A measure of the model's prediction accuracy over time. Lower is better. It penalizes confident wrong predictions heavily.</li>
+                    <li><strong>Trend:</strong> Ideally, both lines should show a gradual improvement or stability. A sharp drop in accuracy or rise in log loss might indicate the model is struggling with recent trends.</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.info("No completed games yet to calculate time series metrics.")
 
 
 if __name__ == "__main__":
