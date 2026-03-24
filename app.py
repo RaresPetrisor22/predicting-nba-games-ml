@@ -9,6 +9,8 @@ from src.features.feature_engineer import load_raw_data
 from scripts.predict_tonight import predict_tonight
 from src.model.feature_importance import get_feature_importance
 
+import streamlit.components.v1 as components
+
 # --- TEAM DICTIONARY ---
 NBA_TEAMS = {
     'ATL': {'name': 'Atlanta Hawks', 'id': '1610612737'},
