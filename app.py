@@ -145,6 +145,26 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# 1. Hide the standard Streamlit footer and menu 
+hide_streamlit_style = """
+<style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+</style>
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
+# 2. Hide the  "Hosted with Streamlit" red badge 
+components.html(
+    """
+    <script>
+    // Hunts down the injected cloud badge and hides it
+    window.parent.document.querySelectorAll('[href*="streamlit.io"]').forEach(e => e.setAttribute("style", "display: none;"));
+    </script>
+    """,
+    height=0,
+    width=0,
+)
 
 # --- MAIN APP ---
 def main():
