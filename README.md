@@ -152,6 +152,35 @@ The scraper (`src/scraping/`) fetches game schedules and box scores from [Basket
    - A margin-of-victory K-factor scales updates based on blowout vs. close game.
 4. **Home-Only Filtering** — Each game appears once (from the home team's perspective) to avoid data leakage.
 
+### Model
+
+A **Logistic Regression** model (C=0.01, max_iter=200) wrapped in a `StandardScaler` pipeline. Training uses:
+
+- **Time-series split** (no data leakage from future games)
+- **5-fold TimeSeriesSplit cross-validation**
+- Final model is retrained on the full dataset before saving
+
+> **Note:** Why **Logistic Regression**? During development, **XGBoost** was tested and achieved a slightly higher raw accuracy. However, tree-based models proved notoriously overconfident on "trap games." Logistic Regression was chosen for production because it achieved a superior *Log Loss (0.620)*. In sports betting and analytics, calibrated probabilities are mathematically more valuable than raw binary accuracy.
+
+#### Performance
+
+Evaluated with out-of-sample predictions on the **2026 Regular Season** (trained on **2015–2025** data — **12,689 games**, **109 features**):
+
+![Model Performance](assets/model_performance.png)
+
+---
+
+## CI/CD Automation
+
+Two GitHub Actions workflows keep the project up-to-date automatically:
+
+| Workflow | Schedule | What It Does |
+|----------|----------|--------------|
+| **Daily NBA Data Update** | Every day at 10:00 UTC | Scrapes new games → rebuilds features → generates predictions → commits to `data/` |
+| **Weekly Model Retrain** | Every Monday at 10:00 UTC | Rebuilds features → retrains model → commits updated `model_pipeline.pkl` |
+
+Both workflows can also be triggered manually via `workflow_dispatch`.
+
 ```mermaid
 flowchart TD
     %% Custom Colors and Styles
@@ -198,34 +227,6 @@ flowchart TD
     CSV ===>|Auto-Deploy| UI
     Model ===>|Loads| UI
 ```
-### Model
-
-A **Logistic Regression** model (C=0.01, max_iter=200) wrapped in a `StandardScaler` pipeline. Training uses:
-
-- **Time-series split** (no data leakage from future games)
-- **5-fold TimeSeriesSplit cross-validation**
-- Final model is retrained on the full dataset before saving
-
-> **Note:** Why **Logistic Regression**? During development, **XGBoost** was tested and achieved a slightly higher raw accuracy. However, tree-based models proved notoriously overconfident on "trap games." Logistic Regression was chosen for production because it achieved a superior *Log Loss (0.620)*. In sports betting and analytics, calibrated probabilities are mathematically more valuable than raw binary accuracy.
-
-#### Performance
-
-Evaluated with out-of-sample predictions on the **2026 Regular Season** (trained on **2015–2025** data — **12,689 games**, **109 features**):
-
-![Model Performance](assets/model_performance.png)
-
----
-
-## CI/CD Automation
-
-Two GitHub Actions workflows keep the project up-to-date automatically:
-
-| Workflow | Schedule | What It Does |
-|----------|----------|--------------|
-| **Daily NBA Data Update** | Every day at 10:00 UTC | Scrapes new games → rebuilds features → generates predictions → commits to `data/` |
-| **Weekly Model Retrain** | Every Monday at 10:00 UTC | Rebuilds features → retrains model → commits updated `model_pipeline.pkl` |
-
-Both workflows can also be triggered manually via `workflow_dispatch`.
 
 ---
 
