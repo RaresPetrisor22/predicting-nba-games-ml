@@ -17,7 +17,8 @@ An automated, end-to-end machine learning pipeline that forecasts NBA game outco
 - [How It Works](#how-it-works)
 - [CI/CD Automation](#cicd-automation)
 - [Tech Stack](#tech-stack)
-- [Contributing](#contributing)
+- [Possible Improvements](#possible-improvements)
+- [Author](#author)
 
 ---
 
@@ -86,12 +87,6 @@ An automated, end-to-end machine learning pipeline that forecasts NBA game outco
 >
 > [![Open in Streamlit](https://img.shields.io/badge/Streamlit-Live_Dashboard-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://predict-nba-ml.streamlit.app/)
 
-### Run the Dashboard Locally
-
-```bash
-streamlit run app.py
-```
-
 The dashboard opens in your browser with four tabs:
 
 | Tab | Description |
@@ -101,6 +96,14 @@ The dashboard opens in your browser with four tabs:
 | **Historical Elo Tracker** | Multi-team Elo rating comparison chart |
 | **Model Performance** | Accuracy, log loss, confusion matrix, calibration curve, and feature importances |
 
+### Run the Dashboard Locally
+
+```bash
+streamlit run app.py
+```
+
+
+
 ### Scrape Latest Games
 
 Fetches new box scores from Basketball Reference, parses them, and rebuilds the feature-engineered dataset:
@@ -108,6 +111,8 @@ Fetches new box scores from Basketball Reference, parses them, and rebuilds the 
 ```bash
 python -m scripts.scrape_games
 ```
+
+> **⚠️ First-time setup:** By default, the scraper only fetches the current season (`ACTIVE_SEASON`). If you're running it for the first time and need all historical data, open `src/scraping/scraper.py` and modify the `get_games()` function to loop over the `SEASONS` variable instead of just `ACTIVE_SEASON`.
 
 ### Generate Tonight's Predictions
 
@@ -146,6 +151,44 @@ The scraper (`src/scraping/`) fetches game schedules and box scores from [Basket
    - A margin-of-victory K-factor scales updates based on blowout vs. close game.
 4. **Home-Only Filtering** — Each game appears once (from the home team's perspective) to avoid data leakage.
 
+flowchart LR
+    subgraph External
+        BR[Basketball Reference]
+    end
+
+    subgraph GHA["GitHub Actions CI/CD"]
+        direction TB
+        Scraper(scrape_games.py)
+        Predictor(predict_tonight.py)
+        Trainer(train_model.py)
+    end
+
+    subgraph Repo["Data & Models"]
+        CSV[(data/*.csv)]
+        Model{{model_pipeline.pkl}}
+    end
+
+    subgraph Production
+        UI[Streamlit Dashboard]
+    end
+
+    %% Daily Data Flow
+    BR -->|Daily Cron Job| Scraper
+    Scraper -->|Updates| CSV
+    
+    %% Prediction Flow
+    CSV -->|Features| Predictor
+    Model -->|Inference| Predictor
+    Predictor -->|Appends| CSV
+    
+    %% Weekly Training Flow
+    CSV -.->|Weekly Cron Job| Trainer
+    Trainer -.->|Retrains & Overwrites| Model
+    
+    %% Deployment
+    CSV ===>|Auto-Deploy| UI
+    Model ===>|Loads| UI
+
 
 ### Model
 
@@ -155,7 +198,7 @@ A **Logistic Regression** model (C=0.01, max_iter=200) wrapped in a `StandardSca
 - **5-fold TimeSeriesSplit cross-validation**
 - Final model is retrained on the full dataset before saving
 
-> **Note:** Several model architectures were evaluated during development, including **Random Forests** and **XGBoosting**. Logistic Regression was ultimately selected as it achieved the best overall performance on this dataset.
+> **Note:** Why **Logistic Regression**? During development, **XGBoost** was tested and achieved a slightly higher raw accuracy. However, tree-based models proved notoriously overconfident on "trap games." Logistic Regression was chosen for production because it achieved a superior *Log Loss (0.620)*. In sports betting and analytics, calibrated probabilities are mathematically more valuable than raw binary accuracy.
 
 #### Performance
 
@@ -193,9 +236,17 @@ Both workflows can also be triggered manually via `workflow_dispatch`.
 
 ---
 
+## Possible Improvements
+
+- 📊 **Scrape more data** — Incorporate injury reports, individual player stats, start scraping older seasons, etc.
+- 📅 **Predict upcoming games** — Extend predictions beyond tonight's matchups to cover the full upcoming schedule
+- 🏆 **Add playoff predictions** — Build a separate model for playoff series outcomes alongside regular season predictions
+
+---
+
 ## Author
 
-**Rares Petrisor** - Aspiring Data Scientist/ML Engineer, CS Student Y1 and Basketball Enthusiast
+**Rares Petrisor** - Aspiring Data Scientist/ML Engineer, CS Student (Y1) and Basketball Enthusiast
 
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Rares_Petrisor-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/rares-petrisor-8830b1335/)
 [![Email](https://img.shields.io/badge/Email-petrisorrares123@gmail.com-EA4335?style=for-the-badge&logo=gmail&logoColor=white)](mailto:petrisorrares123@gmail.com)
