@@ -19,6 +19,7 @@ An automated, end-to-end machine learning pipeline that forecasts NBA game outco
 - [Tech Stack](#tech-stack)
 - [Possible Improvements](#possible-improvements)
 - [Author](#author)
+- [Contributing](#contributing)
 
 ---
 
@@ -152,39 +153,46 @@ The scraper (`src/scraping/`) fetches game schedules and box scores from [Basket
 4. **Home-Only Filtering** — Each game appears once (from the home team's perspective) to avoid data leakage.
 
 ```mermaid
-flowchart LR
-    subgraph External
-        BR[Basketball Reference]
+flowchart TD
+    %% Custom Colors and Styles
+    classDef external fill:#334155,stroke:#94a3b8,stroke-width:2px,color:#fff
+    classDef script fill:#1e40af,stroke:#60a5fa,stroke-width:2px,color:#fff
+    classDef data fill:#854d0e,stroke:#facc15,stroke-width:2px,color:#fff
+    classDef ui fill:#991b1b,stroke:#f87171,stroke-width:2px,color:#fff
+
+    subgraph External["External Source"]
+        BR[Basketball Reference]:::external
     end
 
     subgraph GHA["GitHub Actions CI/CD"]
-        direction TB
-        Scraper(scrape_games.py)
-        Predictor(predict_tonight.py)
-        Trainer(train_model.py)
+        direction LR
+        Scraper(scrape_games.py):::script
+        Trainer(train_model.py):::script
+        Predictor(predict_tonight.py):::script
     end
 
-    subgraph Repo["Data & Models"]
-        CSV[(data/*.csv)]
-        Model{{model_pipeline.pkl}}
+    subgraph Repo["Repository (Data & Models)"]
+        direction LR
+        CSV[(data/*.csv)]:::data
+        Model{{model_pipeline.pkl}}:::data
     end
 
-    subgraph Production
-        UI[Streamlit Dashboard]
+    subgraph Production["Production Cloud"]
+        UI[Streamlit Dashboard]:::ui
     end
 
     %% Daily Data Flow
     BR -->|Daily Cron Job| Scraper
     Scraper -->|Updates| CSV
     
+    %% Weekly Training Flow
+    CSV -.->|Weekly Cron Job| Trainer
+    Trainer -.->|Retrains & Overwrites| Model
+    
     %% Prediction Flow
     CSV -->|Features| Predictor
     Model -->|Inference| Predictor
     Predictor -->|Appends| CSV
-    
-    %% Weekly Training Flow
-    CSV -.->|Weekly Cron Job| Trainer
-    Trainer -.->|Retrains & Overwrites| Model
     
     %% Deployment
     CSV ===>|Auto-Deploy| UI
@@ -261,7 +269,7 @@ Both workflows can also be triggered manually via `workflow_dispatch`.
 
 ## Contributing
 
-Contributions are welcome! To get started:
+Contributions are welcome! Feel free to add your own touch/improvements. To get started:
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/your-feature`)
