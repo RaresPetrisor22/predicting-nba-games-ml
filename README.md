@@ -151,6 +151,7 @@ The scraper (`src/scraping/`) fetches game schedules and box scores from [Basket
    - A margin-of-victory K-factor scales updates based on blowout vs. close game.
 4. **Home-Only Filtering** — Each game appears once (from the home team's perspective) to avoid data leakage.
 
+```mermaid
 flowchart LR
     subgraph External
         BR[Basketball Reference]
@@ -188,8 +189,7 @@ flowchart LR
     %% Deployment
     CSV ===>|Auto-Deploy| UI
     Model ===>|Loads| UI
-
-
+```
 ### Model
 
 A **Logistic Regression** model (C=0.01, max_iter=200) wrapped in a `StandardScaler` pipeline. Training uses:
