@@ -6,3 +6,4 @@ joblib
 numpy
 plotly
 matplotlib
+streamlit
