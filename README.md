@@ -80,7 +80,13 @@ An automated, end-to-end machine learning pipeline that forecasts NBA game outco
 
 ## Usage
 
-### Run the Dashboard
+### 🌐 Live Demo
+
+> **Try it now — no installation required:**
+>
+> [![Open in Streamlit](https://img.shields.io/badge/Streamlit-Live_Dashboard-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://predict-nba-ml.streamlit.app/)
+
+### Run the Dashboard Locally
 
 ```bash
 streamlit run app.py
