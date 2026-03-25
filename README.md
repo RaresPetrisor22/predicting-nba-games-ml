@@ -263,11 +263,6 @@ flowchart TD
 
 ---
 
-<p align="center">
-  <em>Built with ❤️ for basketball and data science</em>
-</p>
-
-
 ## Contributing
 
 Contributions are welcome! Feel free to add your own touch/improvements. To get started:
@@ -280,6 +275,8 @@ Contributions are welcome! Feel free to add your own touch/improvements. To get 
 
 Please make sure your code follows the existing project structure and naming conventions.
 
----
+<p align="center">
+  <em>Built with ❤️ for basketball and data science</em>
+</p>
 
 
