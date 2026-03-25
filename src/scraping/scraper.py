@@ -122,7 +122,7 @@ def scrape_game(standings_file):
 
 
 def get_games():
-    # if running scraper for the first time, all seasons should be scraped, not just the active one
+    # if running scraper for the first time, all seasons should be scraped (use SEASONS variable), not just the active one
     scrape_season(ACTIVE_SEASON)
     standings_files = os.listdir(STANDINGS_DIR)
 
